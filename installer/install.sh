@@ -27,7 +27,9 @@ AUTOSTART_DIR="$USER_HOME/.config/autostart"
 apt-get update
 apt-get install -y \
     openconnect \
+    gnome-terminal \
     python3 \
+    zenity \
     python3-pip \
     python3-gi \
     gir1.2-gtk-3.0 \

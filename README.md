@@ -2,6 +2,8 @@
 
 Aplicativo para conectar e desconectar VPN usando openconnect.
 
+# Para Linux Mint fazer clone na branch linux-mint-20+
+
 # Sistemas Compatíveis:
 
 - Linux Mint

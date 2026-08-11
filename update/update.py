@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import shutil
 import sys
+import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -26,6 +28,74 @@ IGNORED_NAMES = {
     ".venv",
     "venv",
 }
+
+
+def update_sudoers() -> bool:
+    """Atualiza as regras sudoers com as correções de segurança."""
+    try:
+        import os
+        username = os.getenv("USER")
+        if not username:
+            print("Aviso: Não foi possível determinar o usuário atual.")
+            return False
+
+        sudoers_file = f"/etc/sudoers.d/vpn-js-{username}"
+
+        # Verifica se o arquivo sudoers existe
+        if not Path(sudoers_file).exists():
+            print(f"Aviso: Arquivo sudoers não encontrado: {sudoers_file}")
+            print("Execute a reinstalação completa: sudo ./installer/install.sh")
+            return False
+
+        # Encontra os caminhos dos executáveis
+        result_openconnect = subprocess.run(["which", "openconnect"],
+                                          capture_output=True, text=True)
+        result_killall = subprocess.run(["which", "killall"],
+                                      capture_output=True, text=True)
+
+        if result_openconnect.returncode != 0 or result_killall.returncode != 0:
+            print("Erro: openconnect ou killall não encontrados.")
+            return False
+
+        openconnect_path = result_openconnect.stdout.strip()
+        killall_path = result_killall.stdout.strip()
+
+        # Cria arquivo temporário com as novas regras
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.sudoers') as tmp:
+            tmp.write(f"""# JS VPN - Regras restritivas para VPN
+{username} ALL=(root) NOPASSWD: {openconnect_path} --csd-wrapper=/usr/libexec/openconnect/hipreport.sh --base-mtu=1200 -b *
+{username} ALL=(root) NOPASSWD: {killall_path} -SIGINT openconnect
+""")
+            temp_file = tmp.name
+
+        # Valida a sintaxe do arquivo sudoers
+        result = subprocess.run(["sudo", "visudo", "-cf", temp_file],
+                              capture_output=True, text=True)
+
+        if result.returncode != 0:
+            Path(temp_file).unlink(missing_ok=True)
+            print(f"Erro na validação do sudoers: {result.stderr}")
+            return False
+
+        # Instala o novo arquivo sudoers
+        result = subprocess.run([
+            "sudo", "install", "-o", "root", "-g", "root", "-m", "0440",
+            temp_file, sudoers_file
+        ], capture_output=True, text=True)
+
+        # Remove arquivo temporário
+        Path(temp_file).unlink(missing_ok=True)
+
+        if result.returncode == 0:
+            print("✅ Regras sudoers atualizadas com correções de segurança.")
+            return True
+        else:
+            print(f"Erro ao atualizar sudoers: {result.stderr}")
+            return False
+
+    except Exception as e:
+        print(f"Erro ao atualizar sudoers: {e}")
+        return False
 
 
 def ignore_files(
@@ -86,6 +156,8 @@ def install_application() -> None:
     else:
         if backup_dir.exists():
             shutil.rmtree(backup_dir)
+    
+    print("✅ Arquivos Python atualizados com sucesso.")
 
 
 def wait_before_closing() -> None:
@@ -95,15 +167,28 @@ def wait_before_closing() -> None:
 
 def main() -> int:
     try:
+        # Atualiza os arquivos Python
         install_application()
+        
+        # Tenta atualizar as regras sudoers (precisa de sudo)
+        print("\n🔒 Atualizando regras de segurança...")
+        sudoers_updated = update_sudoers()
+        
+        if not sudoers_updated:
+            print("\n⚠️  Aviso: Regras sudoers não foram atualizadas.")
+            print("Para aplicar todas as correções de segurança, execute:")
+            print("sudo ./installer/install.sh")
+        
     except Exception as error:
         print(f"\nErro durante a atualização:\n{error}")
         wait_before_closing()
         return 1
 
-    print("\nJS VPN atualizado com sucesso.")
+    print("\n✅ JS VPN atualizado com sucesso.")
+    if sudoers_updated:
+        print("🛡️  Correções de segurança aplicadas.")
+    
     wait_before_closing()
-
     return 0
 
 

@@ -74,6 +74,16 @@ class MainWindow(Gtk.Window):
             )
             return
 
+        # Valida o formato do host antes de prosseguir
+        import re
+        if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$', host):
+            self.show_message(
+                Gtk.MessageType.ERROR,
+                "Host inválido",
+                "O host da VPN contém caracteres inválidos. Use apenas letras, números, pontos e hífens.",
+            )
+            return
+
         save_host(host)
 
         try:

@@ -89,8 +89,10 @@ fi
 SUDOERS_FILE="/etc/sudoers.d/${APP_ID}-${USERNAME}"
 TEMP_FILE="$(mktemp)"
 
+# Restringe o openconnect a apenas os parâmetros necessários e seguros
 cat > "$TEMP_FILE" <<EOF
-${USERNAME} ALL=(root) NOPASSWD: ${OPENCONNECT_PATH} *
+# JS VPN - Regras restritivas para VPN
+${USERNAME} ALL=(root) NOPASSWD: ${OPENCONNECT_PATH} --csd-wrapper=/usr/libexec/openconnect/hipreport.sh --base-mtu=1200 -b *
 ${USERNAME} ALL=(root) NOPASSWD: ${KILLALL_PATH} -SIGINT openconnect
 EOF
 

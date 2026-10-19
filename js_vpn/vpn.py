@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 import subprocess
-import shlex
+import re
+import sys
 from pathlib import Path
 
+from .auth import GPSAML, HOST_PATTERN, OPENCONNECT
 from .dns_manager import DNSManager
 
-GPSAML = Path.home() / ".local" / "bin" / "gp-saml-gui"
-HIPREPORT = "/usr/libexec/openconnect/hipreport.sh"
-OPENCONNECT = "/usr/sbin/openconnect"
 KILLALL = "/usr/bin/killall"
 
 # Instância global do gerenciador DNS
@@ -32,8 +31,7 @@ def connect(host: str) -> subprocess.Popen:
         raise ValueError("Informe o host da VPN.")
 
     # Valida o formato do host para prevenir command injection
-    import re
-    if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-\.]*[a-zA-Z0-9])?$', host):
+    if not re.fullmatch(HOST_PATTERN, host):
         raise ValueError("Host da VPN contém caracteres inválidos.")
 
     if not GPSAML.exists():
@@ -45,35 +43,16 @@ def connect(host: str) -> subprocess.Popen:
     # Faz backup do DNS antes da conexão
     dns_manager.backup_dns()
 
-    # Usa lista de argumentos em vez de string interpolada para evitar injection
-    command = [
-        "bash", "-c", f"""
-echo 'Será aberta a tela de login Microsoft + MFA.'
-echo
-
-{shlex.quote(str(GPSAML))} \\
-    -S \\
-    --clientos=Linux \\
-    {shlex.quote(host)} \\
-    -- \\
-    --csd-wrapper={shlex.quote(HIPREPORT)} \\
-    --base-mtu=1200 \\
-    -b
-
-RESULT=$?
-
-if [ "$RESULT" -eq 0 ]; then
-    zenity --info --title='JS VPN' --text='VPN conectada com sucesso.'
-else
-    zenity --error --title='JS VPN' --text="Falha ao conectar à VPN. Código: $RESULT"
-fi
-
-exit "$RESULT"
-"""
-    ]
-
     return subprocess.Popen(
-        ["gnome-terminal", "--"] + command,
+        [
+            "gnome-terminal",
+            f"--working-directory={Path(__file__).resolve().parent.parent}",
+            "--",
+            sys.executable,
+            "-m",
+            "js_vpn.auth",
+            host,
+        ],
         start_new_session=True,
     )
 

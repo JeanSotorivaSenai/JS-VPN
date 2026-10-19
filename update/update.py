@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import shutil
 import sys
 import subprocess
@@ -165,19 +166,31 @@ def wait_before_closing() -> None:
         input("\nPressione Enter para fechar...")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Atualiza a instalação da JS VPN.")
+    parser.add_argument(
+        "--skip-sudoers",
+        action="store_true",
+        help="Atualiza apenas os arquivos Python, mantendo as regras sudoers existentes.",
+    )
+    args = parser.parse_args(argv)
+    sudoers_updated = False
+
     try:
         # Atualiza os arquivos Python
         install_application()
         
-        # Tenta atualizar as regras sudoers (precisa de sudo)
-        print("\n🔒 Atualizando regras de segurança...")
-        sudoers_updated = update_sudoers()
-        
-        if not sudoers_updated:
-            print("\n⚠️  Aviso: Regras sudoers não foram atualizadas.")
-            print("Para aplicar todas as correções de segurança, execute:")
-            print("sudo ./installer/install.sh")
+        if args.skip_sudoers:
+            print("\nRegras sudoers existentes preservadas.")
+        else:
+            # Tenta atualizar as regras sudoers (precisa de sudo)
+            print("\n🔒 Atualizando regras de segurança...")
+            sudoers_updated = update_sudoers()
+
+            if not sudoers_updated:
+                print("\n⚠️  Aviso: Regras sudoers não foram atualizadas.")
+                print("Para aplicar todas as correções de segurança, execute:")
+                print("sudo ./installer/install.sh")
         
     except Exception as error:
         print(f"\nErro durante a atualização:\n{error}")
